@@ -5,16 +5,19 @@ import shutil
 import time
 import zipfile
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from groq import Groq
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
 MODEL = "llama-3.3-70b-versatile"
-GENERATED_DIR = "generated_project"
-STATIC_DIR = "static"
+
+# Vercel Serverless Writable Writable Directory Fix (/tmp)
+GENERATED_DIR = "/tmp/generated_project"
+STATIC_DIR = "/tmp/static"
 PROJECT_ZIP_NAME = "project.zip"
+
 FALLBACK_README = "readme_output.txt"
 AGENT_UNAVAILABLE_MSG = "AI Agents are temporarily unavailable. Please try again."
 EXPECTED_PIPELINE_STEPS = 4
@@ -70,9 +73,7 @@ def _get_client():
 def cleanup_previous_generation() -> list[str]:
     """
     Remove artifacts from a prior generation run before starting a new one.
-
-    Safely deletes generated_project/ and static/project.zip if they exist.
-    Returns a list of non-fatal warnings when cleanup partially fails.
+    Safely deletes generated_project/ and static/project.zip if they exist inside /tmp.
     """
     warnings: list[str] = []
 
@@ -94,7 +95,8 @@ def cleanup_previous_generation() -> list[str]:
 
 def call_agent(system_prompt: str, user_message: str, agent_key: str) -> str:
     """Run a single agent turn via the Groq chat completions API."""
-    time.sleep(1)
+    # time.sleep(1) -> Disabled or kept minimal to prevent Vercel 10s timeouts
+    time.sleep(0.2)
 
     client = _get_client()
     agent_name = AGENT_LABELS.get(agent_key, agent_key)
@@ -162,9 +164,6 @@ def save_generated_files(developer_output: str) -> dict:
     """
     Parse delimiter blocks from the final developer response and write files
     into generated_project/.
-
-    If no valid ---FILE:/---END_FILE--- blocks are found (or every path is
-    rejected), the entire raw response is saved as readme_output.txt.
     """
     result: dict = {"saved_files": [], "warnings": [], "used_fallback": False}
 
@@ -205,11 +204,7 @@ def save_generated_files(developer_output: str) -> dict:
 
 
 def zip_directory(directory_path: str, zip_name: str) -> str:
-    """
-    Compress every file under directory_path into static/<zip_name>.
-
-    Returns the absolute path to the created zip archive.
-    """
+    """Compress every file under directory_path into static/<zip_name> inside /tmp."""
     if not os.path.isdir(directory_path):
         raise FileNotFoundError(f"Directory not found: {directory_path}")
 
@@ -293,13 +288,16 @@ def index():
     return render_template("index.html")
 
 
+# New custom route to bypass Vercel read-only system and download zip safely from /tmp
+@app.route("/download-zip")
+def download_zip():
+    return send_from_directory(STATIC_DIR, PROJECT_ZIP_NAME, as_attachment=True)
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
     """
     Orchestrate a 4-step sequential multi-agent pipeline and return a chat timeline.
-
-    Each new request cleans up prior generated artifacts, runs the agent relay,
-    extracts files from the final developer output, and zips them for download.
     """
     data = request.get_json(silent=True) or {}
     user_prompt = (data.get("user_prompt") or "").strip()
@@ -386,7 +384,8 @@ def generate():
 
         if file_result["saved_files"]:
             zip_directory(GENERATED_DIR, PROJECT_ZIP_NAME)
-            download_url = f"/static/{PROJECT_ZIP_NAME}"
+            # Route updated to dynamic endpoint to serve file from secure /tmp storage
+            download_url = "/download-zip"
 
     except (FileNotFoundError, ValueError, OSError, zipfile.BadZipFile) as exc:
         logger.exception("File packaging failed: %s", exc)
