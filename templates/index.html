@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro-SaaS Agent Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+                        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+                    },
+                    animation: {
+                        pulsebar: "pulsebar 1.4s ease-in-out infinite",
+                        shimmer: "shimmer 2s linear infinite",
+                    },
+                    keyframes: {
+                        pulsebar: {
+                            "0%, 100%": { opacity: "0.35" },
+                            "50%": { opacity: "1" },
+                        },
+                        shimmer: {
+                            "0%": { backgroundPosition: "-200% 0" },
+                            "100%": { backgroundPosition: "200% 0" },
+                        },
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="h-full bg-slate-950 text-slate-100 font-sans antialiased">
+    <div class="min-h-full flex flex-col">
+        <!-- Header -->
+        <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-20">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">Micro-SaaS Agent Simulator</h1>
+                        <p class="text-xs sm:text-sm text-slate-400">PM → Developer → QA → Final Build</p>
+                    </div>
+                </div>
+                <div id="status-pill" class="hidden items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="status-text">Idle</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
+            <!-- Error banner -->
+            <div id="error-banner" class="hidden rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+                <p class="font-semibold text-red-100 mb-1">Something went wrong</p>
+                <p id="error-message"></p>
+            </div>
+
+            <!-- Input section -->
+            <section class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6 shadow-xl shadow-black/20">
+                <label for="user-prompt" class="block text-sm font-semibold text-slate-200 mb-3">
+                    Your Micro-SaaS Idea
+                </label>
+                <textarea
+                    id="user-prompt"
+                    rows="4"
+                    placeholder="Describe your Micro-SaaS idea here..."
+                    class="w-full resize-y rounded-xl border border-slate-700 bg-slate-950/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500 transition"
+                ></textarea>
+                <div class="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <p class="text-xs text-slate-500">
+                        Four AI agents will plan, build, review, and package your project.
+                    </p>
+                    <button
+                        id="launch-btn"
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition-all disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                        <svg id="launch-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <svg id="launch-spinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="launch-label">Launch Agents</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Timeline section -->
+            <section class="flex-1 flex flex-col min-h-0 rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden shadow-xl shadow-black/10">
+                <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Multi-Agent Chat Timeline</h2>
+                    <span id="timeline-meta" class="text-xs text-slate-500">Waiting for launch</span>
+                </div>
+                <div id="timeline" class="flex-1 overflow-y-auto px-4 sm:px-5 py-5 space-y-4 max-h-[55vh] sm:max-h-[60vh]">
+                    <div id="timeline-empty" class="flex flex-col items-center justify-center py-16 text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm text-slate-400">Agent conversations will appear here</p>
+                        <p class="text-xs text-slate-600 mt-1">Describe your idea above and launch the pipeline</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Warnings -->
+            <div id="warnings-panel" class="hidden rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3">
+                <p class="text-xs font-semibold text-amber-200 mb-2">Packaging notes</p>
+                <ul id="warnings-list" class="text-xs text-amber-100/80 space-y-1 list-disc list-inside"></ul>
+            </div>
+
+            <!-- Download section -->
+            <section class="pb-4">
+                <a
+                    id="download-btn"
+                    href="#"
+                    download
+                    class="hidden w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-emerald-600/25 transition-all"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download Generated Project
+                    <span id="file-count-badge" class="text-xs font-medium bg-white/20 px-2 py-0.5 rounded-full"></span>
+                </a>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            const AGENT_STYLES = {
+                product_manager: {
+                    label: "Product Manager",
+                    stepLabel: "Defining features & requirements",
+                    border: "border-indigo-500/50",
+                    bg: "bg-indigo-950/40",
+                    badge: "bg-indigo-600",
+                    dot: "bg-indigo-400",
+                    text: "text-indigo-200",
+                    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+                },
+                lead_developer: {
+                    label: "Lead Developer",
+                    stepLabel: "Architecting & writing code",
+                    border: "border-emerald-500/50",
+                    bg: "bg-emerald-950/40",
+                    badge: "bg-emerald-600",
+                    dot: "bg-emerald-400",
+                    text: "text-emerald-200",
+                    icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
+                },
+                qa_engineer: {
+                    label: "QA Engineer",
+                    stepLabel: "Reviewing for flaws & edge cases",
+                    border: "border-amber-500/50",
+                    bg: "bg-amber-950/40",
+                    badge: "bg-amber-600",
+                    dot: "bg-amber-400",
+                    text: "text-amber-200",
+                    icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+                },
+            };
+
+            const PIPELINE_STEPS = [
+                { step: 1, agent_key: "product_manager" },
+                { step: 2, agent_key: "lead_developer" },
+                { step: 3, agent_key: "qa_engineer" },
+                { step: 4, agent_key: "lead_developer", labelOverride: "Lead Developer (Final Revision)" },
+            ];
+
+            const userPromptEl = document.getElementById("user-prompt");
+            const launchBtn = document.getElementById("launch-btn");
+            const launchIcon = document.getElementById("launch-icon");
+            const launchSpinner = document.getElementById("launch-spinner");
+            const launchLabel = document.getElementById("launch-label");
+            const timelineEl = document.getElementById("timeline");
+            const timelineEmpty = document.getElementById("timeline-empty");
+            const timelineMeta = document.getElementById("timeline-meta");
+            const downloadBtn = document.getElementById("download-btn");
+            const fileCountBadge = document.getElementById("file-count-badge");
+            const errorBanner = document.getElementById("error-banner");
+            const errorMessage = document.getElementById("error-message");
+            const warningsPanel = document.getElementById("warnings-panel");
+            const warningsList = document.getElementById("warnings-list");
+            const statusPill = document.getElementById("status-pill");
+            const statusText = document.getElementById("status-text");
+
+            let loadingInterval = null;
+            let activeStepIndex = 0;
+
+            function escapeHtml(text) {
+                const div = document.createElement("div");
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function summarizeOutput(text, agentKey, step) {
+                if (!text) return "No output returned.";
+
+                if (agentKey === "lead_developer" && step === 4) {
+                    const fileMatches = text.match(/---FILE:\s*.+?\s*---/g);
+                    const fileCount = fileMatches ? fileMatches.length : 0;
+                    const withoutFiles = text.replace(/---FILE:\s*.+?\s*---[\s\S]*?---END_FILE---/g, "").trim();
+                    let summary = withoutFiles || "Architecture revision complete.";
+                    if (fileCount > 0) {
+                        summary += `\n\n📦 ${fileCount} project file${fileCount === 1 ? "" : "s"} packaged in the final deliverable.`;
+                    }
+                    return summary;
+                }
+
+                if (text.length > 3000) {
+                    return text.slice(0, 3000) + "\n\n… (truncated for display — full output saved on server)";
+                }
+                return text;
+            }
+
+            function getAgentStyle(agentKey) {
+                return AGENT_STYLES[agentKey] || AGENT_STYLES.lead_developer;
+            }
+
+            function setUiLoading(isLoading) {
+                launchBtn.disabled = isLoading;
+                userPromptEl.disabled = isLoading;
+                launchIcon.classList.toggle("hidden", isLoading);
+                launchSpinner.classList.toggle("hidden", !isLoading);
+                launchLabel.textContent = isLoading ? "Agents Working…" : "Launch Agents";
+                statusPill.classList.toggle("hidden", !isLoading);
+                statusPill.classList.toggle("flex", isLoading);
+            }
+
+            function setStatus(text) {
+                statusText.textContent = text;
+            }
+
+            function hideError() {
+                errorBanner.classList.add("hidden");
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorBanner.classList.remove("hidden");
+            }
+
+            function hideWarnings() {
+                warningsPanel.classList.add("hidden");
+                warningsList.innerHTML = "";
+            }
+
+            function showWarnings(warnings) {
+                if (!warnings || warnings.length === 0) {
+                    hideWarnings();
+                    return;
+                }
+                warningsList.innerHTML = warnings.map(function (w) {
+                    return "<li>" + escapeHtml(w) + "</li>";
+                }).join("");
+                warningsPanel.classList.remove("hidden");
+            }
+
+            function hideDownload() {
+                downloadBtn.classList.add("hidden");
+                downloadBtn.removeAttribute("href");
+            }
+
+            function showDownload(url, savedFiles) {
+                if (!url) {
+                    hideDownload();
+                    return;
+                }
+                downloadBtn.href = url;
+                downloadBtn.classList.remove("hidden");
+                const count = savedFiles ? savedFiles.length : 0;
+                fileCountBadge.textContent = count > 0 ? count + " file" + (count === 1 ? "" : "s") : "";
+            }
+
+            function clearTimeline() {
+                timelineEl.innerHTML = "";
+                hideDownload();
+                hideWarnings();
+                hideError();
+            }
+
+            function createLoadingCard(stepConfig, state) {
+                const style = getAgentStyle(stepConfig.agent_key);
+                const label = stepConfig.labelOverride || style.label;
+                const isActive = state === "active";
+                const isDone = state === "done";
+
+                const card = document.createElement("div");
+                card.className = "agent-card rounded-xl border " + style.border + " " + style.bg + " p-4 transition-all duration-300";
+                card.dataset.step = stepConfig.step;
+                card.dataset.state = state;
+
+                card.innerHTML =
+                    '<div class="flex items-start gap-3">' +
+                        '<div class="flex-shrink-0 w-9 h-9 rounded-lg ' + style.badge + ' flex items-center justify-center shadow-lg">' +
+                            '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + style.icon + '"/>' +
+                            '</svg>' +
+                        '</div>' +
+                        '<div class="flex-1 min-w-0">' +
+                            '<div class="flex items-center gap-2 flex-wrap">' +
+                                '<span class="text-xs font-bold uppercase tracking-wider ' + style.text + '">' + escapeHtml(label) + '</span>' +
+                                '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Step ' + stepConfig.step + '</span>' +
+                                (isDone
+                                    ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700/50">Complete</span>'
+                                    : isActive
+                                        ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-600 flex items-center gap-1">' +
+                                            '<span class="w-1.5 h-1.5 rounded-full ' + style.dot + ' animate-pulse"></span>Working</span>'
+                                        : '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800/60 text-slate-500 border border-slate-700/50">Queued</span>') +
+                            '</div>' +
+                            '<p class="text-xs text-slate-400 mt-1">' + escapeHtml(style.stepLabel) + '</p>' +
+                            (isActive
+                                ? '<div class="mt-3 space-y-2">' +
+                                    '<div class="h-2 rounded-full bg-slate-800 overflow-hidden">' +
+                                        '<div class="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style="background-size:200% 100%"></div>' +
+                                    '</div>' +
+                                    '<div class="flex gap-1">' +
+                                        '<span class="w-2 h-2 rounded-full ' + style.dot + ' animate-pulsebar"></span>' +
+                                        '<span class="w-2 h-2 rounded-full ' + style.dot + ' animate-pulsebar" style="animation-delay:0.2s"></span>' +
+                                        '<span class="w-2 h-2 rounded-full ' + style.dot + ' animate-pulsebar" style="animation-delay:0.4s"></span>' +
+                                    '</div>' +
+                                  '</div>'
+                                : isDone
+                                    ? '<p class="mt-3 text-xs text-emerald-400/80">Response received — rendering…</p>'
+                                    : '<p class="mt-3 text-xs text-slate-600">Waiting for previous agent…</p>') +
+                        '</div>' +
+                    '</div>';
+
+                return card;
+            }
+
+            function renderLoadingPipeline() {
+                timelineEl.innerHTML = "";
+                PIPELINE_STEPS.forEach(function (stepConfig, index) {
+                    const state = index === 0 ? "active" : "queued";
+                    timelineEl.appendChild(createLoadingCard(stepConfig, state));
+                });
+                timelineMeta.textContent = "Step 1 of 4 — Product Manager";
+                activeStepIndex = 0;
+            }
+
+            function advanceLoadingStep() {
+                const cards = timelineEl.querySelectorAll(".agent-card");
+                if (!cards.length || activeStepIndex >= PIPELINE_STEPS.length - 1) return;
+
+                cards[activeStepIndex].dataset.state = "done";
+                cards[activeStepIndex].innerHTML = createLoadingCard(PIPELINE_STEPS[activeStepIndex], "done").innerHTML;
+
+                activeStepIndex += 1;
+                cards[activeStepIndex].dataset.state = "active";
+                cards[activeStepIndex].innerHTML = createLoadingCard(PIPELINE_STEPS[activeStepIndex], "active").innerHTML;
+
+                const current = PIPELINE_STEPS[activeStepIndex];
+                const style = getAgentStyle(current.agent_key);
+                timelineMeta.textContent = "Step " + current.step + " of 4 — " + (current.labelOverride || style.label);
+                setStatus("Running step " + current.step + "…");
+            }
+
+            function startLoadingAnimation() {
+                stopLoadingAnimation();
+                renderLoadingPipeline();
+                setStatus("Running step 1…");
+                loadingInterval = setInterval(advanceLoadingStep, 4500);
+            }
+
+            function stopLoadingAnimation() {
+                if (loadingInterval) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                }
+            }
+
+            function createResultCard(entry) {
+                const style = getAgentStyle(entry.agent_key);
+                const label = entry.step === 4 && entry.agent_key === "lead_developer"
+                    ? "Lead Developer (Final Revision)"
+                    : entry.agent;
+
+                const summary = summarizeOutput(entry.output, entry.agent_key, entry.step);
+
+                const card = document.createElement("article");
+                card.className = "rounded-xl border " + style.border + " " + style.bg + " overflow-hidden shadow-lg animate-[fadeIn_0.4s_ease-out]";
+                card.innerHTML =
+                    '<div class="px-4 py-3 border-b border-white/5 flex items-center gap-3">' +
+                        '<div class="w-8 h-8 rounded-lg ' + style.badge + ' flex items-center justify-center">' +
+                            '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + style.icon + '"/>' +
+                            '</svg>' +
+                        '</div>' +
+                        '<div class="flex-1 min-w-0">' +
+                            '<div class="flex items-center gap-2 flex-wrap">' +
+                                '<h3 class="text-sm font-bold ' + style.text + '">' + escapeHtml(label) + '</h3>' +
+                                '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900/60 text-slate-400 border border-slate-700">Step ' + entry.step + '</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<button type="button" class="toggle-output text-[10px] px-2 py-1 rounded-md bg-slate-900/50 text-slate-400 hover:text-slate-200 border border-slate-700 transition" aria-expanded="false">Expand</button>' +
+                    '</div>' +
+                    '<div class="output-body hidden px-4 py-3 border-b border-white/5">' +
+                        '<p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Agent output</p>' +
+                        '<pre class="text-xs leading-relaxed text-slate-300 whitespace-pre-wrap font-mono bg-slate-950/50 rounded-lg p-3 max-h-64 overflow-y-auto border border-slate-800">' + escapeHtml(summary) + '</pre>' +
+                    '</div>' +
+                    '<div class="px-4 py-2.5 bg-slate-950/30">' +
+                        '<p class="text-xs text-slate-400 line-clamp-3">' + escapeHtml(summary.split("\n")[0].slice(0, 200)) + (summary.length > 200 ? "…" : "") + '</p>' +
+                    '</div>';
+
+                const toggleBtn = card.querySelector(".toggle-output");
+                const outputBody = card.querySelector(".output-body");
+                toggleBtn.addEventListener("click", function () {
+                    const expanded = !outputBody.classList.contains("hidden");
+                    outputBody.classList.toggle("hidden", expanded);
+                    toggleBtn.textContent = expanded ? "Expand" : "Collapse";
+                    toggleBtn.setAttribute("aria-expanded", String(!expanded));
+                });
+
+                return card;
+            }
+
+            function renderTimeline(data) {
+                timelineEl.innerHTML = "";
+
+                if (data.user_prompt) {
+                    const userCard = document.createElement("article");
+                    userCard.className = "rounded-xl border border-slate-700 bg-slate-800/50 p-4";
+                    userCard.innerHTML =
+                        '<div class="flex items-center gap-2 mb-2">' +
+                            '<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">You</span>' +
+                        '</div>' +
+                        '<p class="text-sm text-slate-200">' + escapeHtml(data.user_prompt) + '</p>';
+                    timelineEl.appendChild(userCard);
+                }
+
+                if (data.timeline && data.timeline.length) {
+                    data.timeline.forEach(function (entry, index) {
+                        const card = createResultCard(entry);
+                        card.style.animationDelay = (index * 0.08) + "s";
+                        timelineEl.appendChild(card);
+                    });
+                    timelineMeta.textContent = data.timeline.length + " agent steps completed";
+                } else {
+                    timelineMeta.textContent = "No agent output returned";
+                }
+            }
+
+            async function launchAgents() {
+                const prompt = userPromptEl.value.trim();
+                if (!prompt) {
+                    showError("Please describe your Micro-SaaS idea before launching.");
+                    userPromptEl.focus();
+                    return;
+                }
+
+                clearTimeline();
+                setUiLoading(true);
+                startLoadingAnimation();
+
+                try {
+                    const response = await fetch("/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ user_prompt: prompt }),
+                    });
+
+                    const data = await response.json();
+
+                    stopLoadingAnimation();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || "Request failed with status " + response.status);
+                    }
+
+                    renderTimeline(data);
+                    showWarnings(data.file_warnings);
+                    showDownload(data.download_url, data.saved_files);
+                    setStatus("Pipeline complete");
+
+                } catch (err) {
+                    stopLoadingAnimation();
+                    timelineEl.innerHTML = "";
+                    if (timelineEmpty) {
+                        timelineEl.appendChild(timelineEmpty.cloneNode(true));
+                    }
+                    timelineMeta.textContent = "Pipeline failed";
+                    showError(err.message || "Failed to reach the server. Is Flask running?");
+                    setStatus("Error");
+                } finally {
+                    setUiLoading(false);
+                }
+            }
+
+            launchBtn.addEventListener("click", launchAgents);
+
+            userPromptEl.addEventListener("keydown", function (event) {
+                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    launchAgents();
+                }
+            });
+        })();
+    </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        #timeline::-webkit-scrollbar { width: 6px; }
+        #timeline::-webkit-scrollbar-track { background: transparent; }
+        #timeline::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        #timeline::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</body>
+</html>
