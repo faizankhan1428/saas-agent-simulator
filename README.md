@@ -4,6 +4,14 @@ A production-ready, sequential multi-agent AI pipeline built with **Flask** and 
 
 ---
 
+## 🎬 Live Project Demo
+
+<p align="center">
+  <img src="assets/project.gif" alt="SaaS Agent Simulator Demo" width="100%" />
+</p>
+
+---
+
 ## 🚀 Live Demo Link
 Check out the live application deployed on Vercel:
 🔗 **[Live Demo Link](https://saas-agent-simulator.vercel.app)**
@@ -37,4 +45,3 @@ The platform utilizes a sequential agent relay system to transform a raw user pr
 - **LLM Orchestration:** Groq Cloud SDK (`llama-3.3-70b-versatile`)
 - **Frontend UI:** Responsive Tailwind CSS Interface
 - **Deployment Platform:** Vercel (Serverless Functions)
-
