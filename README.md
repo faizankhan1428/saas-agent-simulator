@@ -4,14 +4,6 @@ A production-ready, sequential multi-agent AI pipeline built with **Flask** and 
 
 ---
 
-## 🎬 Live Project Demo
-
-<p align="center">
-  <img src="assets/project.gif" alt="SaaS Agent Simulator Demo" width="100%" />
-</p>
-
----
-
 ## 🚀 Live Demo Link
 Check out the live application deployed on Vercel:
 🔗 **[Live Demo Link](https://saas-agent-simulator.vercel.app)**
