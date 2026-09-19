@@ -11,8 +11,8 @@ from groq import Groq
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# Updated to stable Groq Model ID
-MODEL = "llama-3.1-70b-versatile"
+# Fast model & token limits to prevent Vercel 10s Serverless Timeout
+MODEL = "llama-3.1-8b-instant"
 
 # Vercel Serverless Writable Directory Fix (/tmp)
 GENERATED_DIR = "/tmp/generated_project"
@@ -96,8 +96,6 @@ def cleanup_previous_generation() -> list[str]:
 
 def call_agent(system_prompt: str, user_message: str, agent_key: str) -> str:
     """Run a single agent turn via the Groq chat completions API."""
-    time.sleep(0.2)
-
     client = _get_client()
     agent_name = AGENT_LABELS.get(agent_key, agent_key)
 
@@ -108,6 +106,8 @@ def call_agent(system_prompt: str, user_message: str, agent_key: str) -> str:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
+            max_tokens=1000,
+            temperature=0.5,
         )
     except Exception as exc:
         logger.error("Groq API error for %s: %s", agent_name, exc)
@@ -352,7 +352,7 @@ def generate():
             "2. Focus ONLY on the core runnable components of this Micro-SaaS — "
             "output a maximum of 2-3 essential files (e.g., main app, one config/route file, "
             "and optionally a short README).\n"
-            "3. Keep every file small and clean so generation completes in under 45 seconds. "
+            "3. Keep every file small and clean so generation completes quickly. "
             "Prefer concise, production-quality code over exhaustive coverage.\n\n"
             "Address the most critical QA concerns only. Skip nice-to-haves, tests, and extra layers.\n\n"
             "Output the project files using the delimiter format below.\n\n"
