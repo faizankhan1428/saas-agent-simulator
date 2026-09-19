@@ -11,9 +11,10 @@ from groq import Groq
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-MODEL = "llama-3.3-70b-versatile"
+# Updated to stable Groq Model ID
+MODEL = "llama-3.1-70b-versatile"
 
-# Vercel Serverless Writable Writable Directory Fix (/tmp)
+# Vercel Serverless Writable Directory Fix (/tmp)
 GENERATED_DIR = "/tmp/generated_project"
 STATIC_DIR = "/tmp/static"
 PROJECT_ZIP_NAME = "project.zip"
@@ -95,7 +96,6 @@ def cleanup_previous_generation() -> list[str]:
 
 def call_agent(system_prompt: str, user_message: str, agent_key: str) -> str:
     """Run a single agent turn via the Groq chat completions API."""
-    # time.sleep(1) -> Disabled or kept minimal to prevent Vercel 10s timeouts
     time.sleep(0.2)
 
     client = _get_client()
@@ -288,7 +288,6 @@ def index():
     return render_template("index.html")
 
 
-# New custom route to bypass Vercel read-only system and download zip safely from /tmp
 @app.route("/download-zip")
 def download_zip():
     return send_from_directory(STATIC_DIR, PROJECT_ZIP_NAME, as_attachment=True)
@@ -384,7 +383,6 @@ def generate():
 
         if file_result["saved_files"]:
             zip_directory(GENERATED_DIR, PROJECT_ZIP_NAME)
-            # Route updated to dynamic endpoint to serve file from secure /tmp storage
             download_url = "/download-zip"
 
     except (FileNotFoundError, ValueError, OSError, zipfile.BadZipFile) as exc:
