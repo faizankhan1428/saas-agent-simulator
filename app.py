@@ -11,8 +11,8 @@ from groq import Groq
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# Fast model & token limits to prevent Vercel 10s Serverless Timeout
-MODEL = "llama-3.1-8b-instant"
+# Active Groq Model
+MODEL = "llama-3.3-70b-versatile"
 
 # Vercel Serverless Writable Directory Fix (/tmp)
 GENERATED_DIR = "/tmp/generated_project"
