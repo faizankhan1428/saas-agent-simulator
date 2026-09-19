@@ -11,10 +11,10 @@ from groq import Groq
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# Guaranteed Active Groq Model
-MODEL = "llama3-8b-8192"
+# Updated Groq Model (Supported production model)
+MODEL = "llama-3.3-70b-versatile"
 
-# Vercel Serverless Writable Directory Fix (/tmp)
+# Vercel Serverless Writable Storage Fix
 GENERATED_DIR = "/tmp/generated_project"
 STATIC_DIR = "/tmp/static"
 PROJECT_ZIP_NAME = "project.zip"
