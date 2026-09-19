@@ -11,8 +11,8 @@ from groq import Groq
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# Active Groq Model
-MODEL = "llama-3.3-70b-versatile"
+# Guaranteed Active Groq Model
+MODEL = "llama3-8b-8192"
 
 # Vercel Serverless Writable Directory Fix (/tmp)
 GENERATED_DIR = "/tmp/generated_project"
@@ -23,10 +23,6 @@ FALLBACK_README = "readme_output.txt"
 AGENT_UNAVAILABLE_MSG = "AI Agents are temporarily unavailable. Please try again."
 EXPECTED_PIPELINE_STEPS = 4
 
-# Matches blocks like:
-#   ---FILE: path/to/file.ext---
-#   <code>
-#   ---END_FILE---
 FILE_BLOCK_PATTERN = re.compile(
     r"---FILE:\s*(.+?)\s*---\s*\n(.*?)\s*---END_FILE---",
     re.DOTALL,
@@ -42,7 +38,6 @@ FILE_FORMAT_INSTRUCTION = (
     "Use forward slashes in file paths. Each file must have both delimiters."
 )
 
-# ── Agent personas (system prompts) ───────────────────────────────────────────
 AGENT_PROMPTS = {
     "product_manager": (
         "You are an expert SaaS Product Manager. "
@@ -72,10 +67,6 @@ def _get_client():
 
 
 def cleanup_previous_generation() -> list[str]:
-    """
-    Remove artifacts from a prior generation run before starting a new one.
-    Safely deletes generated_project/ and static/project.zip if they exist inside /tmp.
-    """
     warnings: list[str] = []
 
     if os.path.isdir(GENERATED_DIR):
@@ -120,10 +111,6 @@ def call_agent(system_prompt: str, user_message: str, agent_key: str) -> str:
 
 
 def _safe_relative_path(filepath: str) -> str | None:
-    """
-    Normalize and validate a model-supplied path so it cannot escape
-    the generated_project root (blocks '..', absolute paths, drive letters).
-    """
     cleaned = filepath.strip().replace("\\", "/")
     if not cleaned or cleaned.startswith("/"):
         return None
@@ -136,7 +123,6 @@ def _safe_relative_path(filepath: str) -> str | None:
 
 
 def _write_text_file(relative_path: str, content: str) -> None:
-    """Write a UTF-8 text file under generated_project/."""
     full_path = os.path.join(GENERATED_DIR, relative_path.replace("/", os.sep))
     parent_dir = os.path.dirname(full_path)
     os.makedirs(parent_dir, exist_ok=True)
@@ -145,10 +131,6 @@ def _write_text_file(relative_path: str, content: str) -> None:
 
 
 def _save_fallback_readme(developer_output: str, result: dict) -> None:
-    """
-    Fallback when delimiter parsing fails: persist the full raw developer
-    response so the user still receives something downloadable.
-    """
     try:
         os.makedirs(GENERATED_DIR, exist_ok=True)
         _write_text_file(FALLBACK_README, developer_output)
@@ -161,10 +143,6 @@ def _save_fallback_readme(developer_output: str, result: dict) -> None:
 
 
 def save_generated_files(developer_output: str) -> dict:
-    """
-    Parse delimiter blocks from the final developer response and write files
-    into generated_project/.
-    """
     result: dict = {"saved_files": [], "warnings": [], "used_fallback": False}
 
     if not developer_output or not developer_output.strip():
@@ -204,7 +182,6 @@ def save_generated_files(developer_output: str) -> dict:
 
 
 def zip_directory(directory_path: str, zip_name: str) -> str:
-    """Compress every file under directory_path into static/<zip_name> inside /tmp."""
     if not os.path.isdir(directory_path):
         raise FileNotFoundError(f"Directory not found: {directory_path}")
 
@@ -227,7 +204,6 @@ def zip_directory(directory_path: str, zip_name: str) -> str:
 
 
 def _timeline_entry(step: int, agent_key: str, user_input: str, agent_output: str) -> dict:
-    """Build one chat-timeline record for the JSON response."""
     return {
         "step": step,
         "agent": AGENT_LABELS[agent_key],
@@ -238,7 +214,6 @@ def _timeline_entry(step: int, agent_key: str, user_input: str, agent_output: st
 
 
 def _validate_timeline(timeline: list[dict]) -> None:
-    """Ensure every pipeline step returned non-empty output before packaging."""
     if len(timeline) != EXPECTED_PIPELINE_STEPS:
         raise ValueError(
             f"Expected {EXPECTED_PIPELINE_STEPS} agent steps, got {len(timeline)}."
@@ -258,7 +233,6 @@ def _validate_success_payload(
     saved_files: list[str],
     download_url: str | None,
 ) -> dict:
-    """Assemble and sanity-check the final JSON payload returned to the client."""
     if not user_prompt:
         raise ValueError("user_prompt is missing from the success payload.")
     if not final_deliverable or not final_deliverable.strip():
@@ -279,7 +253,6 @@ def _validate_success_payload(
 
 
 def _agent_unavailable_response():
-    """Return a safe client-facing message; caller should log the real error."""
     return jsonify({"success": False, "error": AGENT_UNAVAILABLE_MSG}), 500
 
 
@@ -295,9 +268,6 @@ def download_zip():
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    """
-    Orchestrate a 4-step sequential multi-agent pipeline and return a chat timeline.
-    """
     data = request.get_json(silent=True) or {}
     user_prompt = (data.get("user_prompt") or "").strip()
 
@@ -315,7 +285,6 @@ def generate():
     timeline: list[dict] = []
     final_plan = ""
 
-    # ── Multi-agent loop (Groq calls) ───────────────────────────────────────
     try:
         pm_input = (
             "The user wants to build the following Micro-SaaS product:\n\n"
@@ -373,7 +342,6 @@ def generate():
         logger.exception("Groq API error during agent pipeline: %s", exc)
         return _agent_unavailable_response()
 
-    # ── Post-processing: extract files and build downloadable zip ─────────────
     file_result: dict = {"saved_files": [], "warnings": list(cleanup_warnings), "used_fallback": False}
     download_url: str | None = None
 
